@@ -3,13 +3,14 @@ from collections import defaultdict
 from collections import Counter
 import difflib
 import os
+#import krippendorff
 
 
 
 def compute_kappa_from_nervaluate(nervaluate_values):
     # Extract the required counts
-    correct = nervaluate_values['correct']+nervaluate_values['partial']
-    incorrect = nervaluate_values['incorrect']#+nervaluate_values['partial']
+    correct = nervaluate_values['correct']
+    incorrect = nervaluate_values['incorrect']
     missed = nervaluate_values['missed']
     spurious = nervaluate_values['spurious']
 
@@ -20,7 +21,7 @@ def compute_kappa_from_nervaluate(nervaluate_values):
     p_o = correct / total if total > 0 else 0
 
     # Expected agreement (p_e)
-    p_e = ((correct + missed) / total) * ((correct + incorrect) / total) if total > 0 else 0
+    p_e = ((correct + spurious + incorrect) / total) * ((correct + missed) / total) if total > 0 else 0
 
     # Cohen's Kappa (κ)
     kappa = (p_o - p_e) / (1 - p_e) if (1 - p_e) != 0 else 0
@@ -159,8 +160,8 @@ def evaluate_nervaluate(file1, file2):
     results, results_by_tag, result_indices, result_indices_by_tag  = evaluator.evaluate()
 
     print("\n=== Overall Scores ===")
-    #cmethods: 'ent_type', partial strict, exact, emt_type
-    cmethod = 'partial'
+    #cmethods: 'ent_type', partial, strict, exact, emt_type
+    cmethod = 'ent_type'
     printout(cmethod,results_by_tag, results, tag_set)
 
 
@@ -174,22 +175,35 @@ def printout( cmethod, results_by_tag, results, tag_set):
     for m in metrics:
         print("Total : " + str(m) + ":" + str(results[cmethod][m]) + ";")
         nervaluate_values[m] = results[cmethod][m]
-    compute_kappa_from_nervaluate(nervaluate_values)
+    #compute_kappa_from_nervaluate(nervaluate_values)
     for tag in tag_set :
         nervaluate_values={}
         for m in metrics:
             print(tag +" : " +str(m)+":"+str(results_by_tag[tag][cmethod][m])+";")
             nervaluate_values[m] = results_by_tag[tag][cmethod][m]
-        compute_kappa_from_nervaluate(nervaluate_values)
+        #compute_kappa_from_nervaluate(nervaluate_values)
 
 if __name__ == "__main__":
     local= "C:\\Users\\schei008\\surfdrive - Scheider, S. (Simon)@surfdrive.surf.nl\\Exchange\\Exchange\\thesis\\2025\\ADS\\Annotations\\Annotation experiment"
     import sys
     if len(sys.argv) != 3:
         print("Usage: python compare_conll_disagreements.py annotator1.conll annotator2.conll")
-        file2 = os.path.join(local,"1973_Harts\\1973_Harts_Jan_Migratie_UU.conll")
-        file1 = os.path.join(local,"Michiel\\1973_Harts_Jan_Migratie_UU.conll")
-        #highlight_disagreements(file1, file2)
+
+        #file1 = os.path.join(local,"Michiel\\1973_Harts_Jan_Migratie_UU.conll")
+        #file2 = os.path.join(local, "1973_Harts\\1973_Harts_Jan_Migratie_UU.conll")
+        #file1 = os.path.join(local, "Michiel\\1981_Vulto_Marlies_Vrouwen_in_een_nieuwbouwwijk_UU.conll")
+        #file2 = os.path.join(local, "Tarik\\1981_Vulto_Marlies_Vrouwen_in_een_nieuwbouwwijk_UU.conll")
+        #file2 = os.path.join(local, "1981_Vulto_Marlies_Vrouwen_in_een_nieuwbouwwijk_UU\\1981_Vulto_Marlies_Vrouwen_in_een_nieuwbouwwijk_UU.conll")
+        file1 = os.path.join(local, "Michiel\\1988_H~1.conll")
+        #file2 = os.path.join(local, "Tarik\\1988_H_1.conll")
+        file2 = os.path.join(local, "1988_Hassink_Robert_Innovatiebevordering in Baden-Wuerttemburg\\1988_H~1.conll")
+
+        #POSSIBLE(POS) = COR + INC + PAR + MIS = TP + FN
+        #ACTUAL(ACT) = COR + INC + PAR + SPU = TP + FP
+        #Precision = (COR + 0.5 × PAR) / ACT = TP / (TP + FP)
+        #Recall = (COR + 0.5 × PAR)/POS = COR / ACT = TP / (TP + FN)
+
+        highlight_disagreements(file1, file2)
         evaluate_nervaluate(file1, file2)
 
     else:
