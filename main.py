@@ -4,6 +4,7 @@ from collections import Counter
 import difflib
 import os
 #import krippendorff
+import mimetypes
 
 
 
@@ -141,7 +142,7 @@ def get_entities_from_tags(tag_lists):
 
 
 
-def evaluate_nervaluate(file1, file2):
+def evaluate_nervaluate(file1, file2, cmethod = 'ent_type'):
     tags1 = [tags for _, tags in read_conll_tags(file1)]
     tags2 = [tags for _, tags in read_conll_tags(file2)]
     #tags1 = [['B-PER', 'I-PER', 'O', 'B-LOC']]
@@ -159,15 +160,13 @@ def evaluate_nervaluate(file1, file2):
     evaluator = Evaluator(tags1, tags2, tags=list(label_set), loader="list")
     results, results_by_tag, result_indices, result_indices_by_tag  = evaluator.evaluate()
 
-    print("\n=== Overall Scores ===")
+    #print("\n=== Overall Scores ===")
     #cmethods: 'ent_type', partial, strict, exact, emt_type
-    cmethod = 'ent_type'
-    printout(cmethod,results_by_tag, results, tag_set)
-
-
-
+    #cmethod = 'ent_type'
+    #printout(cmethod,results_by_tag, results, tag_set)
     #print(results)
-    print (results)
+    #print (results)
+    return (cmethod,results_by_tag, results, tag_set)
 
 def printout( cmethod, results_by_tag, results, tag_set):
     metrics= ['correct', 'incorrect', 'partial', 'spurious','missed',"f1", 'recall', 'precision']
@@ -183,28 +182,124 @@ def printout( cmethod, results_by_tag, results, tag_set):
             nervaluate_values[m] = results_by_tag[tag][cmethod][m]
         #compute_kappa_from_nervaluate(nervaluate_values)
 
+
+def get_conll_files(folder_path):
+    conll_files = []
+    for root, _, files in os.walk(folder_path):
+        for file in files:
+            if file.lower().endswith('.conll'):
+                conll_files.append( file)
+    return conll_files
+
+def safe_format(value, missing='--'):
+    return f"{value:.2f}" if isinstance(value, (int, float)) else missing
+
+def escape_latex(s):
+    special_chars = {
+        '\\': r'\textbackslash{}',
+        '{': r'\{',
+        '}': r'\}',
+        '#': r'\#',
+        '$': r'\$',
+        '%': r'\%',
+        '&': r'\&',
+        '_': r'\_',
+        '^': r'\^{}',
+        '~': r'\~{}',
+    }
+    for char, escape in special_chars.items():
+        s = s.replace(char, escape)
+    return s
+def generate_latex_table(cmethod, doc_name, agreement,tagset):
+    rows = []
+    header = ["Pair", "Precision", "Recall", "F1"]
+
+    # Start with overall scores
+    rows.append("\\multicolumn{4}{l}{\\textbf{Overall}} \\\\ \\hline")
+    for pair in agreement:
+        results= agreement[pair][0]
+        f1 = results[cmethod]["f1"]
+        p = results[cmethod]["precision"]
+        r = results[cmethod]["recall"]
+        rows.append(f"{pair} & {safe_format(p)} & {safe_format(r)} & {safe_format(f1)} \\\\ \\hline")
+
+    # Then add per-tag scores
+    for tag in tagset:
+        rows.append(f"\\multicolumn{{4}}{{l}}{{\\textbf{{Tag: {tag}}}}} \\\\ \\hline")
+        for pair in agreement:
+            results_by_tag = agreement[pair][1]
+            if tag in results_by_tag:
+                f1 = results_by_tag[tag][cmethod]["f1"]
+                p = results_by_tag[tag][cmethod]["precision"]
+                r = results_by_tag[tag][cmethod]["recall"]
+            else:
+                f1 = '--'
+                p = '--'
+                r = '--'
+            rows.append(f"{pair} & {safe_format(p)} & {safe_format(r)} & {safe_format(f1)} \\\\ \\hline")
+
+    # Compose full LaTeX table
+    table = "\\begin{table}[ht]\n\\centering\n"
+    table += f"\\caption{{Inter-annotator agreement for {escape_latex(doc_name)}}}\n"
+    table += "\\begin{tabular}{lccc}\n\\toprule\n"
+    table += " & ".join(header) + " \\\\ \\midrule\n"
+    table += "\n".join(rows) + "\n"
+    table += "\\bottomrule\n\\end{tabular}\n\\end{table}\n"
+
+    return table
+
 if __name__ == "__main__":
     local= "C:\\Users\\schei008\\surfdrive - Scheider, S. (Simon)@surfdrive.surf.nl\\Exchange\\Exchange\\thesis\\2025\\ADS\\Annotations\\Annotation experiment"
     import sys
     if len(sys.argv) != 3:
         print("Usage: python compare_conll_disagreements.py annotator1.conll annotator2.conll")
-
+        me= os.path.join(local,"Simon")
+        tarik = os.path.join(local,"Tarik")
+        michiel= os.path.join(local,"Michiel")
         #file1 = os.path.join(local,"Michiel\\1973_Harts_Jan_Migratie_UU.conll")
         #file2 = os.path.join(local, "1973_Harts\\1973_Harts_Jan_Migratie_UU.conll")
         #file1 = os.path.join(local, "Michiel\\1981_Vulto_Marlies_Vrouwen_in_een_nieuwbouwwijk_UU.conll")
         #file2 = os.path.join(local, "Tarik\\1981_Vulto_Marlies_Vrouwen_in_een_nieuwbouwwijk_UU.conll")
         #file2 = os.path.join(local, "1981_Vulto_Marlies_Vrouwen_in_een_nieuwbouwwijk_UU\\1981_Vulto_Marlies_Vrouwen_in_een_nieuwbouwwijk_UU.conll")
-        file1 = os.path.join(local, "Michiel\\1988_H~1.conll")
+        #file1 = os.path.join(local, "Michiel\\1988_H~1.conll")
         #file2 = os.path.join(local, "Tarik\\1988_H_1.conll")
-        file2 = os.path.join(local, "1988_Hassink_Robert_Innovatiebevordering in Baden-Wuerttemburg\\1988_H~1.conll")
+        #file2 = os.path.join(local, "1988_Hassink_Robert_Innovatiebevordering in Baden-Wuerttemburg\\1988_H~1.conll")
+        myfiles=get_conll_files(me)
+        print(myfiles)
+        cmethod = 'ent_type'
+        for thesis in myfiles:
+            print(thesis)
+            agreement = {}
+            tag_set = []
+            file1 = os.path.join(me,thesis)
+            tarikfile =os.path.join(tarik, thesis)
+            if os.path.isfile(tarikfile):
+                file2 = tarikfile
+                (cmethod, results_by_tag, results, tag_set) = evaluate_nervaluate(file1, file2,cmethod)
+                agreement["Simon-Tarik"]=[results,results_by_tag]
+                print("Simon-Tarik")
+                highlight_disagreements(file1, file2)
+            michielfile = os.path.join(michiel,thesis)
+            if os.path.isfile(michielfile):
+                file2 = michielfile
+                (cmethod, results_by_tag, results, tag_set) = evaluate_nervaluate(file1, file2,cmethod)
+                agreement["Simon-Michiel"]=[results,results_by_tag]
+                print("Simon-Michiel")
+                highlight_disagreements(file1, file2)
+            print(thesis)
+            print(generate_latex_table(cmethod, thesis, agreement, tag_set))
+
+
+
 
         #POSSIBLE(POS) = COR + INC + PAR + MIS = TP + FN
         #ACTUAL(ACT) = COR + INC + PAR + SPU = TP + FP
         #Precision = (COR + 0.5 × PAR) / ACT = TP / (TP + FP)
         #Recall = (COR + 0.5 × PAR)/POS = COR / ACT = TP / (TP + FN)
 
-        highlight_disagreements(file1, file2)
-        evaluate_nervaluate(file1, file2)
+        #highlight_disagreements(file1, file2)
+        #(cmethod, results_by_tag, results, tag_set) = evaluate_nervaluate(file1, file2)
+
 
     else:
         file1, file2 = sys.argv[1], sys.argv[2]
