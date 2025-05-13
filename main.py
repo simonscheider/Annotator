@@ -1,34 +1,9 @@
 from nervaluate import Evaluator
-from collections import defaultdict
-from collections import Counter
-import difflib
 import os
-#import krippendorff
-import mimetypes
 
 
 
-def compute_kappa_from_nervaluate(nervaluate_values):
-    # Extract the required counts
-    correct = nervaluate_values['correct']
-    incorrect = nervaluate_values['incorrect']
-    missed = nervaluate_values['missed']
-    spurious = nervaluate_values['spurious']
-
-    # Total number of instances
-    total = correct + incorrect + missed + spurious
-
-    # Observed agreement (p_o)
-    p_o = correct / total if total > 0 else 0
-
-    # Expected agreement (p_e)
-    p_e = ((correct + spurious + incorrect) / total) * ((correct + missed) / total) if total > 0 else 0
-
-    # Cohen's Kappa (κ)
-    kappa = (p_o - p_e) / (1 - p_e) if (1 - p_e) != 0 else 0
-
-    print(f"Cohen's Kappa: {kappa:.4f}")
-    return kappa
+#Reads conll files as token tag sequences
 def read_conll_tags(filepath):
     sequences = []
     tokens = []
@@ -79,7 +54,7 @@ def extract_entities(seq):
 
     return spans
 
-
+#This code is just used to visually highlight disagreements in annotations
 def highlight_disagreements(file1, file2):
     data1 = read_conll_tags(file1)
     data2 = read_conll_tags(file2)
@@ -141,7 +116,7 @@ def get_entities_from_tags(tag_lists):
     return all_spans
 
 
-
+#This is the main method to measure agreements by comparing tag sequences
 def evaluate_nervaluate(file1, file2, cmethod = 'ent_type'):
     tags1 = [tags for _, tags in read_conll_tags(file1)]
     tags2 = [tags for _, tags in read_conll_tags(file2)]
@@ -210,6 +185,8 @@ def escape_latex(s):
     for char, escape in special_chars.items():
         s = s.replace(char, escape)
     return s
+
+#This is just to produce a latex table of the resulting inter annotation agreements between annotators.
 def generate_latex_table(cmethod, doc_name, agreement,tagset):
     rows = []
     header = ["Pair", "Precision", "Recall", "F1"]
@@ -249,21 +226,12 @@ def generate_latex_table(cmethod, doc_name, agreement,tagset):
     return table
 
 if __name__ == "__main__":
-    local= "C:\\Users\\schei008\\surfdrive - Scheider, S. (Simon)@surfdrive.surf.nl\\Exchange\\Exchange\\thesis\\2025\\ADS\\Annotations\\Annotation experiment"
+    local= "C:\\Users\\schei008\\surfdrive - Scheider, S. (Simon)@surfdrive.surf.nl\\Exchange\\Exchange\\thesis\\2025\\ADS\\Annotations\\Annotation experiment\\Pre-annotation-experiment"
     import sys
     if len(sys.argv) != 3:
-        print("Usage: python compare_conll_disagreements.py annotator1.conll annotator2.conll")
         me= os.path.join(local,"Simon")
         tarik = os.path.join(local,"Tarik")
         michiel= os.path.join(local,"Michiel")
-        #file1 = os.path.join(local,"Michiel\\1973_Harts_Jan_Migratie_UU.conll")
-        #file2 = os.path.join(local, "1973_Harts\\1973_Harts_Jan_Migratie_UU.conll")
-        #file1 = os.path.join(local, "Michiel\\1981_Vulto_Marlies_Vrouwen_in_een_nieuwbouwwijk_UU.conll")
-        #file2 = os.path.join(local, "Tarik\\1981_Vulto_Marlies_Vrouwen_in_een_nieuwbouwwijk_UU.conll")
-        #file2 = os.path.join(local, "1981_Vulto_Marlies_Vrouwen_in_een_nieuwbouwwijk_UU\\1981_Vulto_Marlies_Vrouwen_in_een_nieuwbouwwijk_UU.conll")
-        #file1 = os.path.join(local, "Michiel\\1988_H~1.conll")
-        #file2 = os.path.join(local, "Tarik\\1988_H_1.conll")
-        #file2 = os.path.join(local, "1988_Hassink_Robert_Innovatiebevordering in Baden-Wuerttemburg\\1988_H~1.conll")
         myfiles=get_conll_files(me)
         print(myfiles)
         cmethod = 'ent_type'
@@ -278,20 +246,19 @@ if __name__ == "__main__":
                 (cmethod, results_by_tag, results, tag_set) = evaluate_nervaluate(file1, file2,cmethod)
                 agreement["Simon-Tarik"]=[results,results_by_tag]
                 print("Simon-Tarik")
-                highlight_disagreements(file1, file2)
+                #highlight_disagreements(file1, file2)
             michielfile = os.path.join(michiel,thesis)
             if os.path.isfile(michielfile):
                 file2 = michielfile
                 (cmethod, results_by_tag, results, tag_set) = evaluate_nervaluate(file1, file2,cmethod)
                 agreement["Simon-Michiel"]=[results,results_by_tag]
                 print("Simon-Michiel")
-                highlight_disagreements(file1, file2)
+                #highlight_disagreements(file1, file2)
             print(thesis)
             print(generate_latex_table(cmethod, thesis, agreement, tag_set))
 
 
-
-
+        # see details in : https://pypi.org/project/nervaluate/
         #POSSIBLE(POS) = COR + INC + PAR + MIS = TP + FN
         #ACTUAL(ACT) = COR + INC + PAR + SPU = TP + FP
         #Precision = (COR + 0.5 × PAR) / ACT = TP / (TP + FP)
